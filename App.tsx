@@ -82,8 +82,13 @@ const App: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      // Use named parameter and direct process.env.API_KEY as per guidelines
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // Use process.env.API_KEY as per coding guidelines
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) {
+        throw new Error("No se encontró la API Key. Verifica que process.env.API_KEY esté definida.");
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
         contents: [{ 
@@ -92,7 +97,6 @@ const App: React.FC = () => {
           }] 
         }],
         config: {
-          // Use Modality enum instead of string literal to fix type error
           responseModalities: [Modality.AUDIO],
           speechConfig: {
             voiceConfig: {
@@ -107,6 +111,10 @@ const App: React.FC = () => {
       }
       
       const ctx = ttsAudioContextRef.current;
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
+
       const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       
       if (base64Audio) {
@@ -131,10 +139,11 @@ const App: React.FC = () => {
           }
         };
       } else {
-        setIsProcessing(false);
+        throw new Error("No se recibieron datos de audio de la API.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("TTS Error:", error);
+      alert(`Error al generar el audio: ${error.message || "Verifica tu conexión a internet o la API Key."}`);
       setIsProcessing(false);
     }
   };
@@ -192,12 +201,12 @@ const App: React.FC = () => {
           )}
         </div>
       </header>
-
-      <main className="w-full max-w-4xl flex-1">
+      
+      <main className="w-full max-w-4xl">
         {step === AppStep.ENTRY && (
-          <TextEntry 
-            onSubmit={handleTextSubmit} 
-            history={history} 
+          <TextEntry
+            onSubmit={handleTextSubmit}
+            history={history}
             selectedVoice={selectedVoice}
             onVoiceChange={handleVoiceChange}
             isDarkMode={isDarkMode}
@@ -205,11 +214,11 @@ const App: React.FC = () => {
         )}
 
         {step === AppStep.PRACTICE && (
-          <ReadingSession 
-            text={inputText} 
-            onTts={startTts} 
+          <ReadingSession
+            text={inputText}
+            onTts={startTts}
             onStopTts={stopTts}
-            onComplete={handleSessionComplete} 
+            onComplete={handleSessionComplete}
             isTtsPlaying={isProcessing}
             selectedVoice={selectedVoice}
             isDarkMode={isDarkMode}
@@ -217,18 +226,14 @@ const App: React.FC = () => {
         )}
 
         {step === AppStep.FEEDBACK && feedback && (
-          <FeedbackDashboard 
-            feedback={feedback} 
-            text={inputText} 
-            onRetry={() => setStep(AppStep.PRACTICE)} 
+          <FeedbackDashboard
+            feedback={feedback}
+            text={inputText}
+            onRetry={reset}
             isDarkMode={isDarkMode}
           />
         )}
       </main>
-
-      <footer className={`mt-12 text-sm pb-8 transition-colors ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-        Diseñado para el aprendizaje • Potenciado por Gemini AI
-      </footer>
     </div>
   );
 };

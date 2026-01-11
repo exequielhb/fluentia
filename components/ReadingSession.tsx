@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, Square, Volume2, Loader2, Sparkles, Clock, AlertTriangle } from 'lucide-react';
 import { GoogleGenAI, LiveServerMessage, Modality, Type } from '@google/genai';
@@ -18,7 +17,7 @@ interface ReadingSessionProps {
 const ReadingSession: React.FC<ReadingSessionProps> = ({ 
   text, 
   onTts, 
-  onStopTts,
+  onStopTts, 
   onComplete, 
   isTtsPlaying, 
   selectedVoice,
@@ -81,7 +80,16 @@ const ReadingSession: React.FC<ReadingSessionProps> = ({
     userTranscriptRef.current = "";
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) {
+        const msg = "Error: API Key no configurada. (process.env.API_KEY)";
+        console.error(msg);
+        setErrorMsg(msg);
+        setIsRecording(false);
+        return;
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       audioContextRef.current = audioCtx;
       
@@ -114,7 +122,7 @@ const ReadingSession: React.FC<ReadingSessionProps> = ({
           },
           onerror: (e) => {
             console.error("Error de sesión en vivo:", e);
-            setErrorMsg("Conexión perdida con el servicio de voz.");
+            setErrorMsg("Conexión interrumpida con el servicio de voz. Intenta de nuevo.");
             stopReading();
           },
           onclose: () => console.log("Sesión en vivo cerrada"),
@@ -140,7 +148,7 @@ const ReadingSession: React.FC<ReadingSessionProps> = ({
     } catch (err) {
       console.error(err);
       setIsRecording(false);
-      setStatusMsg("Error al acceder al micrófono.");
+      setErrorMsg("Error al acceder al micrófono o conectar con la API.");
     }
   };
 
@@ -158,11 +166,16 @@ const ReadingSession: React.FC<ReadingSessionProps> = ({
     setStatusMsg("Generando análisis detallado con Gemini...");
 
     try {
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) {
+        throw new Error("API Key faltante (process.env.API_KEY).");
+      }
+
       // Calculate estimated time based on 200 wpm
       const wordCount = text.split(/\s+/).length;
       const estimatedTime = Math.ceil((wordCount / 200) * 60);
 
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      const ai = new GoogleGenAI({ apiKey });
       
       // We use a robust Flash model for the analytical feedback based on the transcription
       const response = await ai.models.generateContent({
@@ -230,9 +243,15 @@ const ReadingSession: React.FC<ReadingSessionProps> = ({
         throw new Error("Respuesta vacía de Gemini");
       }
 
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error en análisis:", err);
-      setErrorMsg("No se pudo generar el reporte. Por favor intenta de nuevo.");
+      let message = "No se pudo generar el reporte. Por favor intenta de nuevo.";
+      if (err.message && err.message.includes("API Key")) {
+        message = "Error: API Key inválida o faltante.";
+      } else if (err.status === 429) {
+        message = "Has excedido tu cuota de API. Intenta más tarde.";
+      }
+      setErrorMsg(message);
       setIsAnalyzing(false);
     }
   };
@@ -284,7 +303,7 @@ const ReadingSession: React.FC<ReadingSessionProps> = ({
                 {statusMsg}
               </p>
               {errorMsg && (
-                <div className="flex items-center justify-center gap-2 text-red-500 font-bold text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">
+                <div className="flex items-center justify-center gap-2 text-red-500 font-bold text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded-lg animate-in slide-in-from-top-2">
                   <AlertTriangle size={16} />
                   {errorMsg}
                 </div>
