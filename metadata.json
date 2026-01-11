@@ -1,0 +1,7 @@
+{
+  "name": "FluentRead AI",
+  "description": "An interactive English learning application that helps users improve their reading, pronunciation, and intonation through real-time AI feedback and high-quality voice synthesis.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
